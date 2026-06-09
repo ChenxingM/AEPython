@@ -7,6 +7,10 @@
 #include <string.h>
 #elif defined AE_OS_MAC
 #include <wchar.h>
+using UINT = unsigned int;
+#ifndef CP_ACP
+#define CP_ACP 0
+#endif
 #endif
 
 #include "AE_GeneralPlug.h"

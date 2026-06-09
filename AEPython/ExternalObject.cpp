@@ -3,7 +3,14 @@
 
 #include "PythonInstance.h"
 
-#define DllExport extern "C" __declspec( dllexport )
+#include <cstring>
+#include <cstdlib>
+
+#ifdef _WIN32
+	#define DllExport extern "C" __declspec( dllexport )
+#else
+	#define DllExport extern "C" __attribute__((visibility("default")))
+#endif
 
 SoServerInterface* gpServer = nullptr;
 
@@ -11,7 +18,7 @@ static char* stringToCharP(const std::string& src)
 {
 	const auto length = src.length() + 1;
 	char* dst = new char[length];
-	strcpy_s(dst, length, src.c_str());
+	std::memcpy(dst, src.c_str(), length);
 
 	return dst;
 }
@@ -67,7 +74,7 @@ DllExport long ESGetVersion()
 
 DllExport char* ESInitialize(const TaggedData** argv, long argc)
 {
-	return "_exec_ss,_eval_ss";
+	return (char*)"_exec_ss,_eval_ss";
 }
 
 DllExport void ESTerminate()

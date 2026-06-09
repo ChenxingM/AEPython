@@ -23,10 +23,12 @@ extern "C" DllExport AEGP_PluginInitFuncPrototype EntryPointFunc;
 
 #include "PythonInstance.h"
 
+#ifdef _WIN32
 #ifdef _DEBUG
 #pragma comment(lib, "x64/Debug/dll/AEPython.lib")
 #else
 #pragma comment(lib, "x64/Release/dll/AEPython.lib")
+#endif
 #endif
 
 
@@ -69,6 +71,7 @@ static A_Err CommandHook(
 	return err;
 }
 
+#ifdef AE_OS_WIN
 static std::string GetPluginDir()
 {
 	auto hModule = GetModuleHandle("AEPython.aex");
@@ -92,6 +95,12 @@ static void InitPython()
 
 	AEPython::init(S_my_id, sP);
 }
+#else
+static void InitPython()
+{
+	AEPython::init(S_my_id, sP);
+}
+#endif
 
 A_Err EntryPointFunc(
 	struct SPBasicSuite* pica_basicP,			/* >> */

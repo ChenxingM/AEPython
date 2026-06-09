@@ -57,6 +57,7 @@ static std::wstring executeScript(std::wstring w_code)
 	return strRes;
 }
 
+#ifdef AE_OS_WIN
 static std::wstring getPluginPath()
 {
 	auto hModule = GetModuleHandle("AEPython.aex");
@@ -64,6 +65,18 @@ static std::wstring getPluginPath()
 	GetModuleFileNameW(hModule, path, _MAX_PATH);
 	return path;
 }
+#else
+#include <dlfcn.h>
+static std::wstring getPluginPath()
+{
+	Dl_info info;
+	if (dladdr(reinterpret_cast<const void*>(&getPluginPath), &info) && info.dli_fname)
+	{
+		return toWString(info.dli_fname);
+	}
+	return std::wstring();
+}
+#endif
 
 static void startUndoGroup(std::wstring wname)
 {
@@ -100,6 +113,7 @@ void AEPython::init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
 	locals = std::make_unique< py::dict>();
 	py::module_::import("_AEPython").add_object("locals", *locals);
 
+#ifdef AE_OS_WIN
 	exec(u8R"(
 import sys
 import os
@@ -108,6 +122,16 @@ import _AEPython
 sys.path.append(os.path.join(os.path.dirname(_AEPython.getPluginPath()), "Scripts"))
 from AEPython import ae, qtae
 )", "");
+#else
+	exec(u8R"(
+import sys
+import os
+import _AEPython
+
+sys.path.append(os.path.join(os.path.dirname(_AEPython.getPluginPath()), "..", "Resources", "Scripts"))
+from AEPython import ae
+)", "");
+#endif
 }
 
 void showError(py::error_already_set& e, const std::string& esStack) {
@@ -116,8 +140,10 @@ void showError(py::error_already_set& e, const std::string& esStack) {
 		auto msg = esStack + e.what();
 		py::print(msg.c_str(), py::arg("file") = py::module_::import("sys").attr("stderr"));
 	}
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4101)
+#endif
 	catch (py::error_already_set& _)
 	{
 		std::string msg = "Python error.\n";
@@ -125,7 +151,9 @@ void showError(py::error_already_set& e, const std::string& esStack) {
 		AEGP_SuiteHandler suites(sP);
 		suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, msg.c_str());
 	}
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 }
 
 bool AEPython::exec(const std::string& utf8_code, const std::string& esStack)
