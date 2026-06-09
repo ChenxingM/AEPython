@@ -1,4 +1,10 @@
-﻿Python = new ExternalObject("lib:" + BridgeTalk.getAppPath(BridgeTalk.appName) + "/../Plug-ins/AEPython/AEPython.aex")
+﻿var __aepyLib;
+if ($.os.indexOf("Windows") !== -1) {
+    __aepyLib = BridgeTalk.getAppPath(BridgeTalk.appName) + "/../Plug-ins/AEPython/AEPython.aex";
+} else {
+    __aepyLib = File($.fileName).parent.parent.parent.fsName + "/Plug-ins/AEPython/AEPython.plugin";
+}
+Python = new ExternalObject("lib:" + __aepyLib)
 
 Python.exec = function(code){
     return Python._exec(code, $.stack);

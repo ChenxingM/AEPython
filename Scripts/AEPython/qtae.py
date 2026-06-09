@@ -110,6 +110,8 @@ class PythonWindow(QtWidgets.QMainWindow):
 
 def GetQtAEMainWindow():
     global __MainWindow
+    if sys.platform != "win32":
+        return None
     if __MainWindow is None:
         import win32gui
         __MainWindow = QtWidgets.QWidget()
