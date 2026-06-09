@@ -400,3 +400,8 @@ FodyWeavers.xsd
 /Win/*.rc
 /get-pip.py
 /python-3.*-embed-amd64.zip
+
+# macOS
+.DS_Store
+xcuserdata/
+/Mac/build/
