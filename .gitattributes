@@ -1,0 +1,12 @@
+* text=auto
+
+*.sh text eol=lf
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.filters text eol=crlf
+
+*.aex binary
+*.dll binary
+*.zip binary
+*.png binary
+*.7z binary
