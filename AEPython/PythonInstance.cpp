@@ -21,7 +21,40 @@ static auto getMainHWND()
 	return hwnd;
 }
 
-static std::wstring executeScript(std::wstring w_code)
+static void raisePyError(const std::string& message)
+{
+	std::string escaped;
+	escaped.reserve(message.size());
+	for (const char c : message)
+	{
+		switch (c)
+		{
+		case '\\': escaped += "\\\\"; break;
+		case '\'': escaped += "\\'"; break;
+		case '\n': escaped += "\\n"; break;
+		case '\r': escaped += "\\r"; break;
+		default: escaped += c; break;
+		}
+	}
+	py::exec("raise RuntimeError('" + escaped + "')");
+}
+
+static std::string lockedHandleToString(AEGP_SuiteHandler& suites, AEGP_MemHandle handle)
+{
+	std::string dst;
+	if (handle)
+	{
+		A_char* p = NULL;
+		if (suites.MemorySuite1()->AEGP_LockMemHandle(handle, reinterpret_cast<void**>(&p)) == A_Err_NONE && p)
+		{
+			dst = p;
+		}
+		suites.MemorySuite1()->AEGP_FreeMemHandle(handle);
+	}
+	return dst;
+}
+
+static std::string executeScript(std::string utf8_code)
 {
 	A_Err err = A_Err_NONE;
 	AEGP_SuiteHandler suites(sP);
@@ -35,23 +68,19 @@ static std::wstring executeScript(std::wstring w_code)
 		py::exec("raise Exception('ScriptingNotAvailableError')");
 	}
 
-	auto code = toString(w_code, CP_UTF8);
-	ERR(suites.UtilitySuite5()->AEGP_ExecuteScript(S_my_id, code.c_str(), false, &outResultPH, &outErrorStringPH));
+	ERR(suites.UtilitySuite5()->AEGP_ExecuteScript(S_my_id, utf8_code.c_str(), false, &outResultPH, &outErrorStringPH));
 
-	A_char* res = NULL;
-	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(outResultPH, reinterpret_cast<void**>(&res)));
-	std::wstring strRes = toWString(res, CP_UTF8);
+	std::string strRes = lockedHandleToString(suites, outResultPH);
+	std::string strErr = lockedHandleToString(suites, outErrorStringPH);
 
-	A_char* error = NULL;
-	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(outErrorStringPH, reinterpret_cast<void**>(&error)));
-	std::string strErr = error;
-
-	ERR(suites.MemorySuite1()->AEGP_FreeMemHandle(outResultPH));
-	ERR(suites.MemorySuite1()->AEGP_FreeMemHandle(outErrorStringPH));
+	if (err != A_Err_NONE)
+	{
+		raisePyError("ExecuteScriptError:" + std::to_string(err) + ":" + strErr);
+	}
 
 	if (strErr.empty() == false)
 	{
-		py::exec("raise Exception('ExecuteScriptError')");
+		raisePyError("ExecuteScriptError:" + strErr);
 	}
 
 	return strRes;
