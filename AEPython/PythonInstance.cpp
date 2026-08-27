@@ -96,7 +96,9 @@ static std::string executeScript(std::string utf8_code)
 #ifdef AE_OS_WIN
 static std::wstring getPluginPath()
 {
-	auto hModule = GetModuleHandle("AEPython.aex");
+	HMODULE hModule = NULL;
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		reinterpret_cast<LPCWSTR>(&getPluginPath), &hModule);
 	wchar_t path[_MAX_PATH] = L"";
 	GetModuleFileNameW(hModule, path, _MAX_PATH);
 	return path;

@@ -78,26 +78,35 @@ static A_Err CommandHook(
 }
 
 #ifdef AE_OS_WIN
-static std::string GetPluginDir()
+static std::wstring GetPluginDir()
 {
-	auto hModule = GetModuleHandle("AEPython.aex");
-	char charPath[_MAX_PATH] = "";
-	GetModuleFileName(hModule, charPath, _MAX_PATH);
+	HMODULE hModule = NULL;
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		reinterpret_cast<LPCWSTR>(&EntryPointFunc), &hModule);
+	wchar_t path[_MAX_PATH] = L"";
+	GetModuleFileNameW(hModule, path, _MAX_PATH);
 
-	std::string strPath = charPath;
-	return strPath.substr(0, strPath.find_last_of('\\'));
+	std::wstring strPath = path;
+	return strPath.substr(0, strPath.find_last_of(L'\\'));
 }
 
 static void InitPython()
 {
-	auto plugin_dir = GetPluginDir();
+	const auto plugin_dir = GetPluginDir();
 
-	std::string path = getenv("PATH");
-	path = plugin_dir + "\\python-3.11.9-embed-amd64;" + path;
-	_putenv_s("PATH", path.c_str());
+	std::wstring path;
+	const DWORD size = GetEnvironmentVariableW(L"PATH", NULL, 0);
+	if (size > 0)
+	{
+		path.resize(size);
+		GetEnvironmentVariableW(L"PATH", &path[0], size);
+		path.resize(size - 1);
+	}
+	path = plugin_dir + L"\\python-3.11.9-embed-amd64;" + path;
+	SetEnvironmentVariableW(L"PATH", path.c_str());
 
-	auto dll = plugin_dir + "\\AEPython.dll";
-	if (LoadLibrary(dll.c_str()) == NULL)
+	const auto dll = plugin_dir + L"\\AEPython.dll";
+	if (LoadLibraryW(dll.c_str()) == NULL)
 	{
 		AEGP_SuiteHandler suites(sP);
 		suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, "AEPython.dll could not be loaded.");
