@@ -17,8 +17,8 @@ SoServerInterface* gpServer = nullptr;
 static char* stringToCharP(const std::string& src)
 {
 	const auto length = src.length() + 1;
-	char* dst = new char[length];
-	std::memcpy(dst, src.c_str(), length);
+	char* dst = static_cast<char*>(std::malloc(length));
+	if (dst) std::memcpy(dst, src.c_str(), length);
 
 	return dst;
 }
@@ -57,6 +57,10 @@ DllExport long _eval(TaggedData* argv, long argc, TaggedData* retval)
 	else
 	{
 		retval->data.string = stringToCharP(ret);
+		if (retval->data.string == nullptr)
+		{
+			return kESErrEval;
+		}
 		retval->type = kTypeScript;
 		return kESErrOK;
 	}
@@ -64,7 +68,7 @@ DllExport long _eval(TaggedData* argv, long argc, TaggedData* retval)
 
 DllExport void ESFreeMem(void* p)
 {
-	delete(char*)(p);
+	std::free(p);
 }
 
 DllExport long ESGetVersion()
