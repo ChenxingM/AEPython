@@ -19,6 +19,8 @@
 #include "AEGP_SuiteHandler.h"
 #include "AE_Macros.h"
 
+#include <string>
+
 extern "C" DllExport AEGP_PluginInitFuncPrototype EntryPointFunc;
 
 #include "PythonInstance.h"
@@ -34,6 +36,7 @@ extern "C" DllExport AEGP_PluginInitFuncPrototype EntryPointFunc;
 
 static AEGP_Command S_python_cmd = 0;
 static bool S_python_ok = false;
+static bool S_dll_loaded = false;
 
 AEGP_PluginID S_my_id = 0;
 SPBasicSuite* sP = 0;
@@ -67,7 +70,7 @@ static A_Err CommandHook(
 
 	if (command == S_python_cmd) {
 		if (S_python_ok) {
-			AEPython::showWindow();
+			AEPython_showWindow();
 		}
 		else {
 			suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, "Python is unavailable: initialization failed. Check the AEPython installation.");
@@ -113,14 +116,25 @@ static void InitPython()
 		return;
 	}
 
-	S_python_ok = AEPython::init(S_my_id, sP);
+	S_dll_loaded = true;
+	S_python_ok = AEPython_init(S_my_id, sP);
 }
 #else
 static void InitPython()
 {
-	S_python_ok = AEPython::init(S_my_id, sP);
+	S_dll_loaded = true;
+	S_python_ok = AEPython_init(S_my_id, sP);
 }
 #endif
+
+static A_Err DeathHook(AEGP_GlobalRefcon, AEGP_DeathRefcon)
+{
+	if (S_dll_loaded)
+	{
+		AEPython_shutdown();
+	}
+	return A_Err_NONE;
+}
 
 A_Err EntryPointFunc(
 	struct SPBasicSuite* pica_basicP,			/* >> */
@@ -140,6 +154,7 @@ A_Err EntryPointFunc(
 	ERR(suites.CommandSuite1()->AEGP_InsertMenuCommand(S_python_cmd, "Python", AEGP_Menu_WINDOW, AEGP_MENU_INSERT_SORTED));
 	ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(S_my_id, AEGP_HP_BeforeAE, AEGP_Command_ALL, CommandHook, NULL));
 	ERR(suites.RegisterSuite5()->AEGP_RegisterUpdateMenuHook(S_my_id, UpdateMenuHook, NULL));
+	ERR(suites.RegisterSuite5()->AEGP_RegisterDeathHook(S_my_id, DeathHook, NULL));
 
 	InitPython();
 

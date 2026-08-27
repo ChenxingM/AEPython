@@ -14,11 +14,11 @@
 
 SoServerInterface* gpServer = nullptr;
 
-static char* stringToCharP(const std::string& src)
+static char* stringToCharP(const char* src)
 {
-	const auto length = src.length() + 1;
+	const auto length = std::strlen(src) + 1;
 	char* dst = static_cast<char*>(std::malloc(length));
-	if (dst) std::memcpy(dst, src.c_str(), length);
+	if (dst) std::memcpy(dst, src, length);
 
 	return dst;
 }
@@ -31,7 +31,7 @@ DllExport long _exec(TaggedData* argv, long argc, TaggedData* retval)
 		return kESErrBadArgumentList;
 	}
 
-	bool success = AEPython::exec(argv[0].data.string, argv[1].data.string);
+	bool success = AEPython_exec(argv[0].data.string, argv[1].data.string);
 
 	retval->type = kTypeUndefined;
 
@@ -48,22 +48,21 @@ DllExport long _eval(TaggedData* argv, long argc, TaggedData* retval)
 
 	auto code = argv[0].data.string;
 	auto stack = argv[1].data.string;
-	std::string ret = AEPython::eval(code, stack);
+	char* ret = AEPython_eval(code, stack);
 
-	if (ret.length() == 0)
+	if (ret == nullptr)
 	{
 		return kESErrEval;
 	}
-	else
+
+	retval->data.string = stringToCharP(ret);
+	AEPython_free(ret);
+	if (retval->data.string == nullptr)
 	{
-		retval->data.string = stringToCharP(ret);
-		if (retval->data.string == nullptr)
-		{
-			return kESErrEval;
-		}
-		retval->type = kTypeScript;
-		return kESErrOK;
+		return kESErrEval;
 	}
+	retval->type = kTypeScript;
+	return kESErrOK;
 }
 
 DllExport void ESFreeMem(void* p)
@@ -112,7 +111,7 @@ ESerror_t PyObjectBase_finalize(SoHObject hObject)
 
 	if (id != nullptr)
 	{
-		AEPython::del_py_object(*id);
+		AEPython_del_py_object(*id);
 		delete id;
 	}
 

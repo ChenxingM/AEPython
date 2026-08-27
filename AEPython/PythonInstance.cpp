@@ -1,6 +1,9 @@
 #include "PythonInstance.h"
 #include "Util.h"
 
+#include <cstdlib>
+#include <cstring>
+
 #include <pybind11/embed.h>
 #include <pybind11/pybind11.h>
 
@@ -142,7 +145,9 @@ PYBIND11_EMBEDDED_MODULE(_AEPython, m) {
 	m.def("endUndoGroup", endUndoGroup);
 }
 
-bool AEPython::init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
+static bool exec_impl(const std::string& utf8_code, const std::string& esStack);
+
+bool AEPython_init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
 {
 	S_my_id = _my_id;
 	sP = _sP;
@@ -154,7 +159,7 @@ bool AEPython::init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
 		py::module_::import("_AEPython").add_object("locals", *locals);
 
 #ifdef AE_OS_WIN
-		return exec(u8R"(
+		return exec_impl(u8R"(
 import sys
 import os
 import _AEPython
@@ -163,7 +168,7 @@ sys.path.append(os.path.join(os.path.dirname(_AEPython.getPluginPath()), "Script
 from AEPython import ae, qtae
 )", "");
 #else
-		return exec(u8R"(
+		return exec_impl(u8R"(
 import sys
 import os
 import _AEPython
@@ -203,7 +208,7 @@ void showError(py::error_already_set& e, const std::string& esStack) {
 #endif
 }
 
-bool AEPython::exec(const std::string& utf8_code, const std::string& esStack)
+static bool exec_impl(const std::string& utf8_code, const std::string& esStack)
 {
 	try
 	{
@@ -215,40 +220,85 @@ bool AEPython::exec(const std::string& utf8_code, const std::string& esStack)
 		showError(e, esStack);
 		return false;
 	}
+	catch (...)
+	{
+		return false;
+	}
 }
 
-std::string AEPython::eval(const std::string& utf8_code, const std::string& esStack)
+static std::string eval_impl(const std::string& utf8_code, const std::string& esStack)
 {
 	try
 	{
-		static auto _eval = py::module_::import("AEPython.ae").attr("_eval");
-		return _eval(utf8_code).cast<std::string>();
+		return py::module_::import("AEPython.ae").attr("_eval")(utf8_code).cast<std::string>();
 	}
 	catch (py::error_already_set& e)
 	{
 		showError(e, esStack);
 		return "";
 	}
+	catch (...)
+	{
+		return "";
+	}
 }
 
-void AEPython::del_py_object(const long id)
+bool AEPython_exec(const char* utf8_code, const char* es_stack)
 {
+	if (!interpreter) return false;
+	return exec_impl(utf8_code ? utf8_code : "", es_stack ? es_stack : "");
+}
+
+char* AEPython_eval(const char* utf8_code, const char* es_stack)
+{
+	if (!interpreter) return nullptr;
+	const std::string ret = eval_impl(utf8_code ? utf8_code : "", es_stack ? es_stack : "");
+	if (ret.empty()) return nullptr;
+	char* dst = static_cast<char*>(std::malloc(ret.size() + 1));
+	if (dst) std::memcpy(dst, ret.c_str(), ret.size() + 1);
+	return dst;
+}
+
+void AEPython_free(char* p)
+{
+	std::free(p);
+}
+
+void AEPython_del_py_object(long id)
+{
+	if (!interpreter) return;
 	try
 	{
-		static auto _del_py_object = py::module_::import("AEPython.ae").attr("_del_py_object");
-		_del_py_object(id);
+		py::module_::import("AEPython.ae").attr("_del_py_object")(id);
 	}
 	catch (py::error_already_set& e)
 	{
 		auto esStack = "<SoObjectInterface.finalize at PyObjects[" + std::to_string(id) + "]>\n";
 		showError(e, esStack);
 	}
+	catch (...)
+	{
+	}
 }
 
-void AEPython::showWindow()
+void AEPython_showWindow(void)
 {
-	exec(u8R"(
+	if (!interpreter) return;
+	exec_impl(u8R"(
 from AEPython import qtae
 qtae.ShowPythonWindow()
 )", "");
+}
+
+void AEPython_shutdown(void)
+{
+	if (!interpreter) return;
+	try
+	{
+		locals.reset();
+		interpreter.reset();
+	}
+	catch (...)
+	{
+	}
 }
