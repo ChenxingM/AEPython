@@ -11,6 +11,9 @@ using UINT = unsigned int;
 #ifndef CP_ACP
 #define CP_ACP 0
 #endif
+#ifndef CP_UTF8
+#define CP_UTF8 65001
+#endif
 #endif
 
 #include "AE_GeneralPlug.h"

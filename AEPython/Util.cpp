@@ -1,7 +1,5 @@
 #include "Util.h"
 
-#include <vector>
-
 #ifdef AE_OS_WIN
 
 std::string toString(const std::wstring& wstr, UINT CodePage)
@@ -24,35 +22,73 @@ std::wstring toWString(const std::string& str, UINT CodePage)
 
 #else
 
-#include <cwchar>
-#include <cstring>
-
 std::string toString(const std::wstring& wstr, UINT)
 {
-	if (wstr.empty()) return std::string();
-	std::mbstate_t state = std::mbstate_t();
-	const wchar_t* src = wstr.c_str();
-	size_t len = std::wcsrtombs(nullptr, &src, 0, &state);
-	if (len == static_cast<size_t>(-1)) return "[[conversion failed]]";
-	std::vector<char> buf(len + 1);
-	src = wstr.c_str();
-	state = std::mbstate_t();
-	std::wcsrtombs(buf.data(), &src, buf.size(), &state);
-	return std::string(buf.data(), len);
+	std::string dst;
+	dst.reserve(wstr.size() * 4);
+	for (const wchar_t wc : wstr)
+	{
+		const char32_t c = static_cast<char32_t>(wc);
+		if (c < 0x80)
+		{
+			dst += static_cast<char>(c);
+		}
+		else if (c < 0x800)
+		{
+			dst += static_cast<char>(0xC0 | (c >> 6));
+			dst += static_cast<char>(0x80 | (c & 0x3F));
+		}
+		else if (c < 0x10000)
+		{
+			dst += static_cast<char>(0xE0 | (c >> 12));
+			dst += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+			dst += static_cast<char>(0x80 | (c & 0x3F));
+		}
+		else
+		{
+			dst += static_cast<char>(0xF0 | (c >> 18));
+			dst += static_cast<char>(0x80 | ((c >> 12) & 0x3F));
+			dst += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+			dst += static_cast<char>(0x80 | (c & 0x3F));
+		}
+	}
+	return dst;
 }
 
 std::wstring toWString(const std::string& str, UINT)
 {
-	if (str.empty()) return std::wstring();
-	std::mbstate_t state = std::mbstate_t();
-	const char* src = str.c_str();
-	size_t len = std::mbsrtowcs(nullptr, &src, 0, &state);
-	if (len == static_cast<size_t>(-1)) return L"[[conversion failed]]";
-	std::vector<wchar_t> buf(len + 1);
-	src = str.c_str();
-	state = std::mbstate_t();
-	std::mbsrtowcs(buf.data(), &src, buf.size(), &state);
-	return std::wstring(buf.data(), len);
+	std::wstring dst;
+	dst.reserve(str.size());
+	const size_t n = str.size();
+	size_t i = 0;
+	while (i < n)
+	{
+		const unsigned char b0 = static_cast<unsigned char>(str[i]);
+		char32_t c = 0xFFFD;
+		size_t len = 1;
+		if (b0 < 0x80)
+		{
+			c = b0;
+		}
+		else if ((b0 >> 5) == 0x6 && i + 1 < n)
+		{
+			c = ((b0 & 0x1F) << 6) | (str[i + 1] & 0x3F);
+			len = 2;
+		}
+		else if ((b0 >> 4) == 0xE && i + 2 < n)
+		{
+			c = ((b0 & 0x0F) << 12) | ((str[i + 1] & 0x3F) << 6) | (str[i + 2] & 0x3F);
+			len = 3;
+		}
+		else if ((b0 >> 3) == 0x1E && i + 3 < n)
+		{
+			c = ((b0 & 0x07) << 18) | ((str[i + 1] & 0x3F) << 12) | ((str[i + 2] & 0x3F) << 6) | (str[i + 3] & 0x3F);
+			len = 4;
+		}
+		dst += static_cast<wchar_t>(c);
+		i += len;
+	}
+	return dst;
 }
 
 #endif
