@@ -1,5 +1,50 @@
 #include "Util.h"
 
+std::u16string toU16String(const std::string& str)
+{
+	std::u16string dst;
+	dst.reserve(str.size());
+	const size_t n = str.size();
+	size_t i = 0;
+	while (i < n)
+	{
+		const unsigned char b0 = static_cast<unsigned char>(str[i]);
+		char32_t c = 0xFFFD;
+		size_t len = 1;
+		if (b0 < 0x80)
+		{
+			c = b0;
+		}
+		else if ((b0 >> 5) == 0x6 && i + 1 < n)
+		{
+			c = ((b0 & 0x1F) << 6) | (str[i + 1] & 0x3F);
+			len = 2;
+		}
+		else if ((b0 >> 4) == 0xE && i + 2 < n)
+		{
+			c = ((b0 & 0x0F) << 12) | ((str[i + 1] & 0x3F) << 6) | (str[i + 2] & 0x3F);
+			len = 3;
+		}
+		else if ((b0 >> 3) == 0x1E && i + 3 < n)
+		{
+			c = ((b0 & 0x07) << 18) | ((str[i + 1] & 0x3F) << 12) | ((str[i + 2] & 0x3F) << 6) | (str[i + 3] & 0x3F);
+			len = 4;
+		}
+		if (c < 0x10000)
+		{
+			dst += static_cast<char16_t>(c);
+		}
+		else
+		{
+			const char32_t v = c - 0x10000;
+			dst += static_cast<char16_t>(0xD800 | (v >> 10));
+			dst += static_cast<char16_t>(0xDC00 | (v & 0x3FF));
+		}
+		i += len;
+	}
+	return dst;
+}
+
 #ifdef AE_OS_WIN
 
 std::string toString(const std::wstring& wstr, UINT CodePage)

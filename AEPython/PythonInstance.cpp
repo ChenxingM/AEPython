@@ -175,10 +175,9 @@ void showError(py::error_already_set& e, const std::string& esStack) {
 #endif
 	catch (py::error_already_set& _)
 	{
-		std::string msg = "Python error.\n";
-		msg += e.what();
+		const auto msg = toU16String("Python error.\n" + std::string(e.what()));
 		AEGP_SuiteHandler suites(sP);
-		suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, msg.c_str());
+		suites.UtilitySuite6()->AEGP_ReportInfoUnicode(S_my_id, reinterpret_cast<const A_UTF16Char*>(msg.c_str()));
 	}
 #ifdef _MSC_VER
 #pragma warning(pop)

@@ -30,3 +30,4 @@ using UINT = unsigned int;
 
 std::string toString(const std::wstring& wstr, UINT CodePage = CP_ACP);
 std::wstring toWString(const std::string& str, UINT CodePage = CP_ACP);
+std::u16string toU16String(const std::string& utf8);
