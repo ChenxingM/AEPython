@@ -33,6 +33,7 @@ extern "C" DllExport AEGP_PluginInitFuncPrototype EntryPointFunc;
 
 
 static AEGP_Command S_python_cmd = 0;
+static bool S_python_ok = false;
 
 AEGP_PluginID S_my_id = 0;
 SPBasicSuite* sP = 0;
@@ -65,7 +66,12 @@ static A_Err CommandHook(
 	*handledPB = FALSE;
 
 	if (command == S_python_cmd) {
-		AEPython::showWindow();
+		if (S_python_ok) {
+			AEPython::showWindow();
+		}
+		else {
+			suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, "Python is unavailable: initialization failed. Check the AEPython installation.");
+		}
 		*handledPB = TRUE;
 	}
 	return err;
@@ -91,14 +97,19 @@ static void InitPython()
 	_putenv_s("PATH", path.c_str());
 
 	auto dll = plugin_dir + "\\AEPython.dll";
-	LoadLibrary(dll.c_str());
+	if (LoadLibrary(dll.c_str()) == NULL)
+	{
+		AEGP_SuiteHandler suites(sP);
+		suites.UtilitySuite5()->AEGP_ReportInfo(S_my_id, "AEPython.dll could not be loaded.");
+		return;
+	}
 
-	AEPython::init(S_my_id, sP);
+	S_python_ok = AEPython::init(S_my_id, sP);
 }
 #else
 static void InitPython()
 {
-	AEPython::init(S_my_id, sP);
+	S_python_ok = AEPython::init(S_my_id, sP);
 }
 #endif
 

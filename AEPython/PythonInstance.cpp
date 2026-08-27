@@ -12,6 +12,13 @@ std::unique_ptr<py::dict> locals;
 static AEGP_PluginID S_my_id;
 static SPBasicSuite* sP;
 
+static void reportError(const std::string& utf8)
+{
+	const auto msg = toU16String(utf8);
+	AEGP_SuiteHandler suites(sP);
+	suites.UtilitySuite6()->AEGP_ReportInfoUnicode(S_my_id, reinterpret_cast<const A_UTF16Char*>(msg.c_str()));
+}
+
 static auto getMainHWND()
 {
 	A_Err err = A_Err_NONE;
@@ -133,17 +140,19 @@ PYBIND11_EMBEDDED_MODULE(_AEPython, m) {
 	m.def("endUndoGroup", endUndoGroup);
 }
 
-void AEPython::init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
+bool AEPython::init(AEGP_PluginID _my_id, SPBasicSuite* _sP)
 {
 	S_my_id = _my_id;
 	sP = _sP;
 
-	interpreter = std::make_unique< py::scoped_interpreter>();
-	locals = std::make_unique< py::dict>();
-	py::module_::import("_AEPython").add_object("locals", *locals);
+	try
+	{
+		interpreter = std::make_unique< py::scoped_interpreter>();
+		locals = std::make_unique< py::dict>();
+		py::module_::import("_AEPython").add_object("locals", *locals);
 
 #ifdef AE_OS_WIN
-	exec(u8R"(
+		return exec(u8R"(
 import sys
 import os
 import _AEPython
@@ -152,7 +161,7 @@ sys.path.append(os.path.join(os.path.dirname(_AEPython.getPluginPath()), "Script
 from AEPython import ae, qtae
 )", "");
 #else
-	exec(u8R"(
+		return exec(u8R"(
 import sys
 import os
 import _AEPython
@@ -161,6 +170,16 @@ sys.path.append(os.path.join(os.path.dirname(_AEPython.getPluginPath()), "..", "
 from AEPython import ae
 )", "");
 #endif
+	}
+	catch (const std::exception& e)
+	{
+		reportError("AEPython initialization failed.\n" + std::string(e.what()));
+	}
+	catch (...)
+	{
+		reportError("AEPython initialization failed.");
+	}
+	return false;
 }
 
 void showError(py::error_already_set& e, const std::string& esStack) {
@@ -175,9 +194,7 @@ void showError(py::error_already_set& e, const std::string& esStack) {
 #endif
 	catch (py::error_already_set& _)
 	{
-		const auto msg = toU16String("Python error.\n" + std::string(e.what()));
-		AEGP_SuiteHandler suites(sP);
-		suites.UtilitySuite6()->AEGP_ReportInfoUnicode(S_my_id, reinterpret_cast<const A_UTF16Char*>(msg.c_str()));
+		reportError("Python error.\n" + std::string(e.what()));
 	}
 #ifdef _MSC_VER
 #pragma warning(pop)

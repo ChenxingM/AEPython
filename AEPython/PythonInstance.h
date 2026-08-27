@@ -10,7 +10,7 @@
 
 namespace AEPython
 {
-	AEPY_API void init(AEGP_PluginID _my_id, SPBasicSuite* _sP);
+	AEPY_API bool init(AEGP_PluginID _my_id, SPBasicSuite* _sP);
 	AEPY_API bool exec(const std::string& utf8_code, const std::string& esStack);
 	AEPY_API std::string eval(const std::string& utf8_code, const std::string& esStack);
 	AEPY_API void del_py_object(const long id);
